@@ -19,6 +19,20 @@ class LinearRegression:
         # Här sparas intercept (skärningspunkten med y-axeln, dvs vad y är när x = 0)
         self.intercept = None
 
+    @property
+    def number_of_features(self):
+        """
+        Returnerar antalet features (kolumner/dimensioner) i modellen.
+        """
+        return self._dimensions
+
+    @property
+    def sample_size(self):
+        """
+        Returnerar antalet datapunkter (rader) i modellen.
+        """
+        return self._sample_size
+
     def fit(self, X, y):
         """
         Denna metod ska räkna ut interceptet och koefficienterna för linjär regression.
@@ -74,6 +88,12 @@ class LinearRegression:
         # Ta bort interceptet från koefficienterna så att vi bara har lutningarna kvar.
         self.coefficients = self.coefficients[1:]
 
+        # Antal kolumner i X exklusive intercept
+        self._dimensions = X.shape[1] - 1
+
+        # Antalet rader i X
+        self._sample_size = X.shape[0]
+
     def predict(self, X):
         """
         Här ska vi skriva predict-metoden som ska ta nya X-värden och använda koefficienterna för att förutsäga y-värden.
@@ -116,8 +136,30 @@ class LinearRegression:
         R2 = 1 - SSE / SST
         return R2
 
+    def variance(self, X, y):
+        """
+        Beräknar variansen (σ²) för modellen. Variansen mäter spridningen av felet mellan de observerade värdena (y) och de förutsagda värdena (y^).
+        Formel: σ² = SSE / (n - d - 1) där SSE = Σ(y - y^)², n är stickprovsstorleken och d är antalet dimensioner (features).
+        """
+        predicted_values = self.predict(X)
+        SSE = np.sum((y - predicted_values) ** 2)
+
+        n = self.sample_size  # Stickprovsstorleken
+        d = self.number_of_features  # Antal dimensioner
+
+        variance = SSE / (n - d - 1)
+        return variance
+
+    """
+    Att implementera:
+    * beräkning av standardavvikelsen
+    * signifikans för regressionen 
+    """
+
 
 model = LinearRegression()
+
+# Tränar modellen:
 model.fit(X, y)
 print("Intercept (B0):", model.intercept)
 print("Koefficienter (B1, ...):", model.coefficients)
@@ -125,10 +167,20 @@ print("Koefficienter (B1, ...):", model.coefficients)
 # Nya testvärden för X
 X_new = np.array([6, 7, 8])
 
-# Test för att förutsäga med modellen
+# Testar för att förutsäga med modellen:
 y_pred = model.predict(X_new)
 print("Förutsagda värden:", y_pred)
 
-# Test för R2-metoden med samma data
+# Testar för R2-metoden med samma data:
 r2 = model.r_squared(X, y)
 print("R²:", r2)
+
+# Kontrollerar antal dimensioner:
+print("Antal features (dimensioner):", model.number_of_features)
+
+# Kontrollerar stickprovsstorleken:
+print("Antal datapunkter (n):", model.sample_size)
+
+# Beräknar variansen:
+variance = model.variance(X, y)
+print("Varians (σ²):", variance)
