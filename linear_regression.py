@@ -150,11 +150,46 @@ class LinearRegression:
         variance = SSE / (n - d - 1)
         return variance
 
-    """
-    Att implementera:
-    * beräkning av standardavvikelsen
-    * signifikans för regressionen 
-    """
+    def standard_deviation(self, X, y):
+        """
+        Beräknar standardavvikelsen (σ) för modellen. Den visar den genomsnittliga spridningen av felet mellan observerade och förutsagda värden.
+        Formel: σ = √(σ²)
+        """
+
+        # Beräknar variansen (σ²) för modellen
+        variance = self.variance(X, y)
+
+        # Beräknar standardavvikelsen (σ) genom att ta kvadratroten av variansen (σ²)
+        standard_deviation = np.sqrt(variance)
+        return standard_deviation
+
+    def significance(self, X, y):
+        """
+        Beräknar F-statistik och signifikansen för regressionen. F-statistiken används för att testa om minst en av de oberoende variablerna har en signifikant effekt på den beroende variabeln.
+        Formel: F = (SSR / d) / σ²
+        """
+        predicted_values = self.predict(X)
+
+        # Beräknar SSR (Sum of Squared Errors)
+        sse = np.sum((y - predicted_values) ** 2)
+        # Beräknar SST (Total Sum of Squares)
+        sst = np.sum((y - np.mean(y)) ** 2)
+        # Beräknar SSR (Sum of Squared Regression)
+        ssr = sst - sse
+
+        dimensions = self.number_of_features
+
+        variance = self.variance(X, y)
+
+        f_stat = (ssr / dimensions) / variance
+
+        # Beräknar stickprovsstorleken
+        n = self.sample_size
+
+        # Beräknar p-värdet, vilket är sannolikheten att få ett F-värde som är lika extremt som det observerade F-värdet. Om p-värdet är mindre än 0.05 så är det signifikant.
+        p_value = stats.f.sf(f_stat, dimensions, n - dimensions - 1)
+
+        return f_stat, p_value
 
 
 model = LinearRegression()
@@ -184,3 +219,12 @@ print("Antal datapunkter (n):", model.sample_size)
 # Beräknar variansen:
 variance = model.variance(X, y)
 print("Varians (σ²):", variance)
+
+# Beräknar standardavvikelsen:
+standard_deviation = model.standard_deviation(X, y)
+print("Standardavvikelse (σ):", standard_deviation)
+
+# Beräknar signifikans för regressionen:
+f_stat, p_value = model.significance(X, y)
+print("F-statistik:", f_stat)
+print("p-värde:", p_value)
