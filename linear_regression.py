@@ -1,9 +1,6 @@
 import numpy as np
 import scipy.stats as stats
 
-
-data_path = "./data/Small-diameter-flow.csv"
-
 # Testdata
 X = np.array([1, 2, 3, 4, 5])  # Oberoende variabel
 y = np.array([2.2, 2.8, 4.5, 3.7, 5.5])  # Beroende variabel
@@ -138,9 +135,27 @@ class LinearRegression:
 
     def variance(self, X, y):
         """
-        Beräknar variansen (σ²) för modellen. Variansen mäter spridningen av felet mellan de observerade värdena (y) och de förutsagda värdena (y^).
-        Formel: σ² = SSE / (n - d - 1) där SSE = Σ(y - y^)², n är stickprovsstorleken och d är antalet dimensioner (features).
+        Beräknar variansen (σ²) för modellen. 
+
+        Variansen mäter spridningen av felen mellan de observerade värdena (y) och de förutsagda värdena (ŷ). 
+        Det är ett mått på hur mycket dessa felvärden (residualerna) sprider sig runt sitt medelvärde.
+
+        - **Låg varians** → Felen är små och konsekventa, vilket tyder på att modellen passar data väl.
+        - **Hög varians** → Felen varierar mycket, vilket kan indikera att modellen inte beskriver data väl.
+
+        Enkelt förklarat -> varians mäter hur pass nära de faktiska värdena är jämfört med de förutsagda värdena.
+        Om jag förutsäger att jag ska laga 10 pannkakor ifrån en smet men får 12 så är variansen 2 (((12 - 10)^2) / 2). 
+        Om jag förutsäger att jag ska laga 10 pannkakor ifrån en smet men får 8 så är variansen också 2 (((8 - 10)^2) / 2). 
+        Formel: 
+            σ² = SSE / (n - d - 1)
+            
+        där:
+            - SSE (Sum of Squared Errors) = Σ(y - ŷ)², summan av kvadrerade residualer.
+            - n = Antalet observationer (stickprovsstorleken).
+            - d = Antalet oberoende variabler (features) i modellen.
+            - n - d - 1 är frihetsgraderna i modellen.
         """
+
         predicted_values = self.predict(X)
         SSE = np.sum((y - predicted_values) ** 2)
 
@@ -153,6 +168,15 @@ class LinearRegression:
     def standard_deviation(self, X, y):
         """
         Beräknar standardavvikelsen (σ) för modellen. Den visar den genomsnittliga spridningen av felet mellan observerade och förutsagda värden.
+        Den är mer noggrann eftersom man tar roten ur variansen och därför återför värdet till samma enhet som innan.
+        Exempel: 
+        En kock lagar pannkakor 5 gånger efter ett recept som ska ge 10 pannkakor. Hans resultat (mängden pannkakor)
+        skiljer sig dock efter varje gång, med resultaten [5, 15, 2, 18, 8]. 
+        Genomsnittet på dessa mängder pannkakor är (5 + 15 + 2 + 18 + 8) / 5 = 9.6. 
+        Variansen räknas ut där σ² = 36 (36.08, men vi ignorerar decimaler i detta fall).
+        Roten ur 36 är 6, vilket ger en standardavvikelse på 6. 
+        Kocken lagar alltså 9.6 +/- 6 pannkakor varje gång. 
+
         Formel: σ = √(σ²)
         """
 
@@ -165,31 +189,71 @@ class LinearRegression:
 
     def significance(self, X, y):
         """
-        Beräknar F-statistik och signifikansen för regressionen. F-statistiken används för att testa om minst en av de oberoende variablerna har en signifikant effekt på den beroende variabeln.
-        Formel: F = (SSR / d) / σ²
+        Beräknar F-statistik och p-värde för regressionens signifikans.
         """
         predicted_values = self.predict(X)
 
-        # Beräknar SSR (Sum of Squared Errors)
         sse = np.sum((y - predicted_values) ** 2)
-        # Beräknar SST (Total Sum of Squares)
+
         sst = np.sum((y - np.mean(y)) ** 2)
-        # Beräknar SSR (Sum of Squared Regression)
+
         ssr = sst - sse
 
-        dimensions = self.number_of_features
+        d = self.number_of_features
+
+        n = self.sample_size
+
 
         variance = self.variance(X, y)
 
-        f_stat = (ssr / dimensions) / variance
+        f_stat = (ssr / d) / variance
 
-        # Beräknar stickprovsstorleken
-        n = self.sample_size
 
-        # Beräknar p-värdet, vilket är sannolikheten att få ett F-värde som är lika extremt som det observerade F-värdet. Om p-värdet är mindre än 0.05 så är det signifikant.
-        p_value = stats.f.sf(f_stat, dimensions, n - dimensions - 1)
+        p_value = stats.f.sf(f_stat, d, n - d - 1)
 
         return f_stat, p_value
+
+    
+
+    def individual_significance(self, X, y):
+        """
+        Beräknar T-statistik och p-värde för varje individuell koefficient.
+        """
+
+        if X.ndim == 1:
+            X = X[:, np.newaxis]
+
+        c = np.linalg.pinv(X.T @ X) * self.variance(X, y)
+
+
+        t_values = [self.coefficients[i] / (np.sqrt(c[i, i])) for i in range(c.shape[1] - 1)]
+
+
+        dof = self.sample_size - self.number_of_features - 1
+
+
+        cdf = stats.t.cdf(t_values, dof)
+        sf = stats.t.sf(t_values, dof)
+
+
+        p_values = [2 * min(cdf[idx], sf[idx]) for idx in range(len(t_values))]
+
+        return t_values, p_values
+
+
+
+    """
+    Att implementera:
+    * signifikans för enskilda variabler
+    * Pearsons korrelation mellan alla par av variabler
+    * konfidensintervall för individuella parametrar
+    * en property för konfidensnivå
+    * undersökning av observationsbias i datan
+    """
+
+
+
+
 
 
 model = LinearRegression()
@@ -208,7 +272,7 @@ print("Förutsagda värden:", y_pred)
 
 # Testar för R2-metoden med samma data:
 r2 = model.r_squared(X, y)
-print("R²:", r2)
+print("R² (hur bra modellen passar datan):", r2)
 
 # Kontrollerar antal dimensioner:
 print("Antal features (dimensioner):", model.number_of_features)
@@ -218,13 +282,12 @@ print("Antal datapunkter (n):", model.sample_size)
 
 # Beräknar variansen:
 variance = model.variance(X, y)
-print("Varians (σ²):", variance)
+print("Varians, dvs hur mycket de faktiska värdena skiljer sig ifrån de förutsagda värdena (σ²):", variance)
 
 # Beräknar standardavvikelsen:
 standard_deviation = model.standard_deviation(X, y)
-print("Standardavvikelse (σ):", standard_deviation)
+print("Standardavvikelse, vilket visar en mer noggrann skillnad mellan de förutsagda värdena och de faktiska värdena (σ):", standard_deviation)
 
 # Beräknar signifikans för regressionen:
-f_stat, p_value = model.significance(X, y)
-print("F-statistik:", f_stat)
-print("p-värde:", p_value)
+print("F-statistik:", model.significance(X, y))
+
