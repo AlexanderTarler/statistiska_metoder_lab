@@ -7,7 +7,7 @@ y = np.array([2.2, 2.8, 4.5, 3.7, 5.5])  # Beroende variabel
 
 
 class LinearRegression:
-    def __init__(self):
+    def __init__(self, confidence_level=0.95):
         """
         Initialiserar klassen med tomma attribut.
         """
@@ -15,6 +15,8 @@ class LinearRegression:
         self.coefficients = None
         # Här sparas intercept (skärningspunkten med y-axeln, dvs vad y är när x = 0)
         self.intercept = None
+        # Här sparas confidence level för modellen (default = 95%).
+        self._confidence_level = confidence_level
 
     @property
     def number_of_features(self):
@@ -29,6 +31,23 @@ class LinearRegression:
         Returnerar antalet datapunkter (rader) i modellen.
         """
         return self._sample_size
+    
+    @property
+    def confidence_level(self):
+        """
+        Returnerar confidence level för modellen.
+        """
+        return self._confidence_level
+    
+    @confidence_level.setter
+    def confidence_level(self, new_level):
+        """
+        Uppdaterar confidence level, men ser till att den är mellan 0 och 1.
+        """
+        if 0 < new_level < 1:
+            self._confidence_level = new_level
+        else:
+            raise ValueError("Konfidensnivån måste vara mellan 0 och 1.")
 
     def fit(self, X, y):
         """
@@ -71,6 +90,7 @@ class LinearRegression:
         # "".T" används för att transponera en matris. Exempel: om X är en matris så är X.T transponeringen av X.
 
         # Nedanför så tar vi alltså klassens attribut "coefficients" och sätter det till att vara lika med (X^T * X)^-1 * X^T * y.
+        # Denna formel kallas för "Ordinary Least Squares" (OLS) och används för att hitta den bästa passningen för en linje genom datapunkter.
         # Uträkningen görs i tre steg:
         # 1. X^T * X (X transponerat multiplicerat med X)
         # 2. (X^T * X)^-1 (invertering av X^T * X)
@@ -240,16 +260,79 @@ class LinearRegression:
 
         return t_values, p_values
 
+    def pearson_correlation(self, X, y):
+        """
+        Beräknar Pearsons korrelation mellan alla features i X och målvärdet y.
+        Returnerar en dictionary där nycklarna är feature-namnen och värdena är (korrelation, p-värde).
+        """
+
+    
+
+        if X.ndim == 1:
+            X = X[:, np.newaxis]
 
 
-    """
-    Att implementera:
-    * signifikans för enskilda variabler
-    * Pearsons korrelation mellan alla par av variabler
-    * konfidensintervall för individuella parametrar
-    * en property för konfidensnivå
-    * undersökning av observationsbias i datan
-    """
+        correlation_results = {}
+
+
+        for i in range(X.shape[1]):  # Vi loopar igenom varje feature i X
+            correlation, p_value = stats.pearsonr(X[:, i].ravel(), y)
+            correlation_results[f"Feature {i+1}"] = (correlation, p_value)
+
+        return correlation_results
+
+    def confidence_intervals(self, X, y):
+        """
+        Beräknar konfidensintervall för varje regressionskoefficient i modellen.
+        
+        X: Oberoende variabler
+        y: Beroende variabel
+        confidence: Konfidensnivå (default = 95%)
+        
+        Returnerar ett dictionary med konfidensintervall för varje koefficient.
+        """
+
+      
+        X = np.array(X, dtype=float)
+        y = np.array(y, dtype=float)
+
+     
+        if X.ndim == 1:
+            X = X[:, np.newaxis]
+
+      
+
+
+        n, d = X.shape
+
+       
+        sigma = self.standard_deviation(X, y)
+
+
+        covariance_matrix = np.linalg.pinv(X.T @ X) * sigma**2
+
+     
+        alpha = 1 - self.confidence_level
+        dof = self.sample_size - self.number_of_features - 1 
+        t_value = stats.t.ppf(1 - alpha/2, dof)  
+
+   
+        confidence_intervals = {}
+
+        
+        for i in range(d):
+            beta_i = np.r_[self.intercept, self.coefficients][i]  
+            standard_error = np.sqrt(covariance_matrix[i, i]) 
+            margin_of_error = t_value * standard_error  
+         
+            lower_bound = beta_i - margin_of_error
+            upper_bound = beta_i + margin_of_error
+
+       
+            confidence_intervals[f"Beta {i}"] = (lower_bound, upper_bound)
+
+        return confidence_intervals
+
 
 
 
@@ -284,10 +367,15 @@ print("Antal datapunkter (n):", model.sample_size)
 variance = model.variance(X, y)
 print("Varians, dvs hur mycket de faktiska värdena skiljer sig ifrån de förutsagda värdena (σ²):", variance)
 
+# Beräknar signifikans för regressionen:
+print("F-statistik:", model.significance(X, y))
+
 # Beräknar standardavvikelsen:
 standard_deviation = model.standard_deviation(X, y)
 print("Standardavvikelse, vilket visar en mer noggrann skillnad mellan de förutsagda värdena och de faktiska värdena (σ):", standard_deviation)
 
-# Beräknar signifikans för regressionen:
-print("F-statistik:", model.significance(X, y))
+correlation_results = model.pearson_correlation(X, y)
+
+for feature, (corr, p_val) in correlation_results.items():
+    print(f"{feature}: Korrelation = {corr:.3f}, p-värde = {p_val:.3f}")
 
