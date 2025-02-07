@@ -1,21 +1,14 @@
 import numpy as np
 import scipy.stats as stats
 
-# Testdata
-X = np.array([1, 2, 3, 4, 5])  # Oberoende variabel
-y = np.array([2.2, 2.8, 4.5, 3.7, 5.5])  # Beroende variabel
-
 
 class LinearRegression:
+
     def __init__(self, confidence_level=0.95):
-        """
-        Initialiserar klassen med tomma attribut.
-        """
-        # Här sparas lutningen (Hur mycket y ökar per enhet x)
         self.coefficients = None
-        # Här sparas intercept (skärningspunkten med y-axeln, dvs vad y är när x = 0)
+
         self.intercept = None
-        # Här sparas confidence level för modellen (default = 95%).
+
         self._confidence_level = confidence_level
 
     @property
@@ -31,18 +24,18 @@ class LinearRegression:
         Returnerar antalet datapunkter (rader) i modellen.
         """
         return self._sample_size
-    
+
     @property
     def confidence_level(self):
         """
         Returnerar confidence level för modellen.
         """
         return self._confidence_level
-    
+
     @confidence_level.setter
     def confidence_level(self, new_level):
         """
-        Uppdaterar confidence level, men ser till att den är mellan 0 och 1.
+        Uppdaterar confidence level och ser till att den är mellan 0 och 1.
         """
         if 0 < new_level < 1:
             self._confidence_level = new_level
@@ -50,133 +43,65 @@ class LinearRegression:
             raise ValueError("Konfidensnivån måste vara mellan 0 och 1.")
 
     def fit(self, X, y):
-        """
-        Denna metod ska räkna ut interceptet och koefficienterna för linjär regression.
-        Den beräknar koefficienterna med Least Squares Estimation (LSE).
 
-        Formeln för LSE är: β = (X^T * X)^-1 * X^T * y
-
-        X: insatsdata (features/oberoende variabler), en matris. 
-            X är inputmatrisen som innehåller alla oberoende variabler (features).
-            Varje kolumn i X representerar en oberoende variabel.
-            Varje rad i X representerar en datapunkt (en observation).
-
-        y: målvärden (beroende variabel).
-
-        """
-
-        # Om X är en en-dimensionell array, gör [:, np.newaxis] det till en kolumn (2D-array)
-        # ":" representerar här att vi vill ha alla rader, och "np.newaxis" lägger till en ny axel (kolumn) i arrayen.
-        # Om raderna t.ex är [1, 2, 3] blir arrayen till [[1], [2], [3]].
-
+        # Om X är en en-dimensionell array så ser koden till att göra den till en kolumn (2D-array) för att kunna använda den i matrisberäkningar.
         if X.ndim == 1:
             X = X[:, np.newaxis]
 
-        # Lägg till en kolumn av ettor för intercept (β0), dvs vad y är när x = 0
-        # np.c_ är en funktion som används för att sammanfoga arrayer längs kolumnaxeln, där np.ones(X.shape[0]) skapar en array av ettor med samma antal rader som X.
-        # np.c_[np.ones(X.shape[0]), X] lägger sedan in arrayern av ettor som första kolumn i X. X.shape[0] betyder att vi vill att antalet rader av ettor ska vara lika med antalet rader i X.
-        # PS: ifall vi skulle byta plats på np.ones(X.shape[0]) och X så skulle vi få en array där kolumnen med ettor är sist.
-
+        # Här lägger jag till en kolumn av ettor för intercept (β0), dvs vad y är när x = 0.
         X = np.c_[np.ones(X.shape[0]), X]
 
-        # Beräkna koefficienterna med LSE (Least Squares Estimation)
+        # Nedanför använder jag OLS (Least Ordinary Squares) för att hitta den bästa passningen för en linje genom datapunkterna.
+        self.coefficients = np.linalg.pinv(X.T @ X) @ X.T @ y
 
-        # koefficienterna är en vektor som innehåller interceptet och lutningen för varje oberoende variabel.
-        # Förenklat så kan man se β som "k" i en linjär ekvation y = kx + m, där k är lutningen och m är interceptet.
-
-        # Formeln för LSE är β = (X^T * X)^-1 * X^T * y
-        # "np.linalg.inv" används för att invertera en matris.
-        # "@"" används för att multiplicera matriser.
-        # "".T" används för att transponera en matris. Exempel: om X är en matris så är X.T transponeringen av X.
-
-        # Nedanför så tar vi alltså klassens attribut "coefficients" och sätter det till att vara lika med (X^T * X)^-1 * X^T * y.
-        # Denna formel kallas för "Ordinary Least Squares" (OLS) och används för att hitta den bästa passningen för en linje genom datapunkter.
-        # Uträkningen görs i tre steg:
-        # 1. X^T * X (X transponerat multiplicerat med X)
-        # 2. (X^T * X)^-1 (invertering av X^T * X)
-        # 3. (X^T * X)^-1 * X^T * y (multiplikation av inverteringen av X^T * X med X^T och y).
-
-        self.coefficients = np.linalg.inv(X.T @ X) @ X.T @ y
-        print("Koefficienter (inklusive intercept):", self.coefficients)
-
-        # Spara interceptet och koefficienterna i separata attribut
-        # Interceptet är den första koefficienten, och resten av koefficienterna är lutningarna för varje oberoende variabel.
+        # För att hitta interceptet så tar jag första koefficienten.
         self.intercept = self.coefficients[0]
-        # Ta bort interceptet från koefficienterna så att vi bara har lutningarna kvar.
+        # Jag sorterar sedan bort interceptet från koefficienterna så att bara lutningarna är kvar.
         self.coefficients = self.coefficients[1:]
 
-        # Antal kolumner i X exklusive intercept
+        # Här ger jag variablerna _dimensions och _sample_size värden.
         self._dimensions = X.shape[1] - 1
-
-        # Antalet rader i X
         self._sample_size = X.shape[0]
 
     def predict(self, X):
         """
-        Här ska vi skriva predict-metoden som ska ta nya X-värden och använda koefficienterna för att förutsäga y-värden.
-
-        Formel: y^ = β0 + β1*x1 + β2*x2 + ... + βn*xn
-        I matrisform: y^ = X * β
-        Där β=[β0, β1, β2, ... , βn] och XX är matrisen med inputvärden (inklusive kolumnen med ettor för interceptet).
+        Gör en förutsägelse för varje datapunkt i X.
         """
 
-        #  Återigen så kollar vi om X är en en-dimensionell array och om den är det så använder vi [:, np.newaxis] för att göra den till en kolumn (2D-array).
         if X.ndim == 1:
             X = X[:, np.newaxis]
 
-        # Likt ovan så lägger vi till en kolumn av ettor för intercept (β0), dvs vad y är när x = 0
         X = np.c_[np.ones(X.shape[0]), X]
 
-        # I koden nedan så multiplicerar vi X med koefficienterna för att få en förutsägelse för y.
-        # Vi returnerar sedan en matris där varje rad är en förutsägelse för varje datapunkt i X.
+        # I koden nedan så multiplicerar jag X med koefficienterna för att få en förutsägelse för y.
+        # Jag returnerar sedan en matris där varje rad är en förutsägelse för varje datapunkt i X.
 
         prediction_results = X @ np.r_[self.intercept, self.coefficients]
         return prediction_results
 
     def r_squared(self, X, y):
         """
-        Beräknar R² (förklaringsgraden) för modellen. Den visar hur bra modellen passar data genom att visa en procentsats.
-        X: Oberoende variabler.
-        y: Beroende variabler.
-        Formel: R2 = 1 - SSE / SST där SSE = Σ(y - y^)² och SST = Σ(y - y_mean)² och SST = Σ(y - y_mean)²
-
+        Beräknar R² (förklaringsgraden) för modellen. 
         """
 
         predicted_values = self.predict(X)
 
-        # Beräkna SSE (Sum of Squared Errors)
+        # Beräknar SSE (Sum of Squared Errors)
         SSE = np.sum((y - predicted_values) ** 2)
-        # Beräkna SST (Total Sum of Squares)
+        # Beräknar SST (Total Sum of Squares)
         SST = np.sum((y - np.mean(y)) ** 2)
 
-        # Beräkna R²
+        # Beräknar R²
         R2 = 1 - SSE / SST
         return R2
 
     def variance(self, X, y):
         """
         Beräknar variansen (σ²) för modellen. 
-
-        Variansen mäter spridningen av felen mellan de observerade värdena (y) och de förutsagda värdena (ŷ). 
-        Det är ett mått på hur mycket dessa felvärden (residualerna) sprider sig runt sitt medelvärde.
-
-        - **Låg varians** → Felen är små och konsekventa, vilket tyder på att modellen passar data väl.
-        - **Hög varians** → Felen varierar mycket, vilket kan indikera att modellen inte beskriver data väl.
-
-        Enkelt förklarat -> varians mäter hur pass nära de faktiska värdena är jämfört med de förutsagda värdena.
-        Om jag förutsäger att jag ska laga 10 pannkakor ifrån en smet men får 12 så är variansen 2 (((12 - 10)^2) / 2). 
-        Om jag förutsäger att jag ska laga 10 pannkakor ifrån en smet men får 8 så är variansen också 2 (((8 - 10)^2) / 2). 
-        Formel: 
-            σ² = SSE / (n - d - 1)
-            
-        där:
-            - SSE (Sum of Squared Errors) = Σ(y - ŷ)², summan av kvadrerade residualer.
-            - n = Antalet observationer (stickprovsstorleken).
-            - d = Antalet oberoende variabler (features) i modellen.
-            - n - d - 1 är frihetsgraderna i modellen.
         """
 
         predicted_values = self.predict(X)
+
         SSE = np.sum((y - predicted_values) ** 2)
 
         n = self.sample_size  # Stickprovsstorleken
@@ -187,17 +112,7 @@ class LinearRegression:
 
     def standard_deviation(self, X, y):
         """
-        Beräknar standardavvikelsen (σ) för modellen. Den visar den genomsnittliga spridningen av felet mellan observerade och förutsagda värden.
-        Den är mer noggrann eftersom man tar roten ur variansen och därför återför värdet till samma enhet som innan.
-        Exempel: 
-        En kock lagar pannkakor 5 gånger efter ett recept som ska ge 10 pannkakor. Hans resultat (mängden pannkakor)
-        skiljer sig dock efter varje gång, med resultaten [5, 15, 2, 18, 8]. 
-        Genomsnittet på dessa mängder pannkakor är (5 + 15 + 2 + 18 + 8) / 5 = 9.6. 
-        Variansen räknas ut där σ² = 36 (36.08, men vi ignorerar decimaler i detta fall).
-        Roten ur 36 är 6, vilket ger en standardavvikelse på 6. 
-        Kocken lagar alltså 9.6 +/- 6 pannkakor varje gång. 
-
-        Formel: σ = √(σ²)
+        Beräknar standardavvikelsen (σ) för modellen. 
         """
 
         # Beräknar variansen (σ²) för modellen
@@ -219,163 +134,122 @@ class LinearRegression:
 
         ssr = sst - sse
 
-        d = self.number_of_features
-
         n = self.sample_size
-
+        d = self.number_of_features
 
         variance = self.variance(X, y)
 
         f_stat = (ssr / d) / variance
 
-
         p_value = stats.f.sf(f_stat, d, n - d - 1)
 
         return f_stat, p_value
 
-    
-
     def individual_significance(self, X, y):
         """
         Beräknar T-statistik och p-värde för varje individuell koefficient.
+        Om X endast innehåller en binär variabel (Observer) används Welch's t-test.
         """
-
         if X.ndim == 1:
             X = X[:, np.newaxis]
 
         c = np.linalg.pinv(X.T @ X) * self.variance(X, y)
 
+        # För att kunna använda denna metoden när jag undersöker "Observer bias" så behöver jag göra ett specialfall när jag bara har en binär variabel.
+        if c.shape[1] == 1:
+            # Här isolerar jag de två grupperna i vår binära variabel så att jag får två separata listor med y-värden, en för varje Observer.
+            y_group_0 = y[X.flatten() == 0]
+            y_group_1 = y[X.flatten() == 1]
 
-        t_values = [self.coefficients[i] / (np.sqrt(c[i, i])) for i in range(c.shape[1] - 1)]
+            # Jag beräknar sedan medelvärdet, variansen och antal observationer för varje grupp.
 
+            mean_0, mean_1 = np.mean(y_group_0), np.mean(y_group_1)
 
+            var_0, var_1 = np.var(y_group_0, ddof=1), np.var(y_group_1, ddof=1)
+
+            n_0, n_1 = len(y_group_0), len(y_group_1)
+
+            # Jag beräknar sedan t-värdet med hjälp av "Welch's t-test", vilket jag använder eftersom det ska vara en bra metod för att jämföra två grupper med olika varians.
+            t_value = (mean_0 - mean_1) / np.sqrt(var_0 / n_0 + var_1 / n_1)
+
+            # Frihetsgrader (DOF)
+            dof = ((var_0 / n_0 + var_1 / n_1) ** 2) / (
+                ((var_0 / n_0) ** 2) / (n_0 - 1) +
+                ((var_1 / n_1) ** 2) / (n_1 - 1)
+            )
+
+            # P-värde
+            p_value = 2 * min(stats.t.cdf(t_value, dof),
+                              stats.t.sf(t_value, dof))
+            return [t_value], [p_value]
+
+        # Standardberäkning för flera variabler
+        t_values = [self.coefficients[i] /
+                    (np.sqrt(c[i, i])) for i in range(c.shape[1] - 1)]
         dof = self.sample_size - self.number_of_features - 1
-
-
-        cdf = stats.t.cdf(t_values, dof)
-        sf = stats.t.sf(t_values, dof)
-
-
-        p_values = [2 * min(cdf[idx], sf[idx]) for idx in range(len(t_values))]
+        p_values = [2 * min(stats.t.cdf(t, dof), stats.t.sf(t, dof))
+                    for t in t_values]
 
         return t_values, p_values
 
-    def pearson_correlation(self, X, y):
+    def pearson_correlation_matrix(self, X, feature_names):
         """
-        Beräknar Pearsons korrelation mellan alla features i X och målvärdet y.
-        Returnerar en dictionary där nycklarna är feature-namnen och värdena är (korrelation, p-värde).
+        Beräknar Pearsons korrelationskoefficient mellan alla par av features i X.
         """
-
-    
-
         if X.ndim == 1:
             X = X[:, np.newaxis]
 
+        num_features = X.shape[1]
+        correlation_matrix = {}
 
-        correlation_results = {}
+        for i in range(num_features):
+            for j in range(i + 1, num_features):
+                feature_1 = feature_names[i]
+                feature_2 = feature_names[j]
+                correlation, p_value = stats.pearsonr(X[:, i], X[:, j])
+                correlation_matrix[(feature_1, feature_2)] = (
+                    correlation, p_value)
 
-
-        for i in range(X.shape[1]):  # Vi loopar igenom varje feature i X
-            correlation, p_value = stats.pearsonr(X[:, i].ravel(), y)
-            correlation_results[f"Feature {i+1}"] = (correlation, p_value)
-
-        return correlation_results
+        return correlation_matrix
 
     def confidence_intervals(self, X, y):
         """
         Beräknar konfidensintervall för varje regressionskoefficient i modellen.
-        
-        X: Oberoende variabler
-        y: Beroende variabel
-        confidence: Konfidensnivå (default = 95%)
-        
-        Returnerar ett dictionary med konfidensintervall för varje koefficient.
         """
 
-      
         X = np.array(X, dtype=float)
         y = np.array(y, dtype=float)
 
-     
         if X.ndim == 1:
             X = X[:, np.newaxis]
 
-      
+        _, features = X.shape
 
+        standard_deviation = self.standard_deviation(X, y)
 
-        n, d = X.shape
+        # Jag använder np.linalg.pinv för att invertera matrisen och då få "cii​" (diagonalen i inverterade matrisen).
+        covariance_matrix = np.linalg.pinv(X.T @ X) * standard_deviation**2
 
-       
-        sigma = self.standard_deviation(X, y)
-
-
-        covariance_matrix = np.linalg.pinv(X.T @ X) * sigma**2
-
-     
+        # Signifikansnivån (alpha = 1 - konfidensnivån) används för att beräkna marginalen av fel i intervallet
         alpha = 1 - self.confidence_level
-        dof = self.sample_size - self.number_of_features - 1 
-        t_value = stats.t.ppf(1 - alpha/2, dof)  
 
-   
+        dof = self.sample_size - self.number_of_features - 1
+
+        # det kritiska t-värdet används för att beräkna  marginalen av fel i intervallet.
+        # ppf står för "percent point function" och används för att beräkna det kritiska t-värdet för en viss konfidensnivå.
+        t_critical = stats.t.ppf(1 - alpha/2, dof)  # Här får vi fram tα/2​
+
         confidence_intervals = {}
 
-        
-        for i in range(d):
-            beta_i = np.r_[self.intercept, self.coefficients][i]  
-            standard_error = np.sqrt(covariance_matrix[i, i]) 
-            margin_of_error = t_value * standard_error  
-         
-            lower_bound = beta_i - margin_of_error
-            upper_bound = beta_i + margin_of_error
+        for i in range(features):
+            coefficient_value = self.coefficients[i]
+            standard_error = np.sqrt(covariance_matrix[i, i])
+            margin_of_error = t_critical * standard_deviation * standard_error
 
-       
-            confidence_intervals[f"Beta {i}"] = (lower_bound, upper_bound)
+            lower_bound = coefficient_value - margin_of_error
+            upper_bound = coefficient_value + margin_of_error
+
+            confidence_intervals[f"Coefficient {i}"] = (
+                coefficient_value, margin_of_error, lower_bound, upper_bound)
 
         return confidence_intervals
-
-
-
-
-
-
-
-model = LinearRegression()
-
-# Tränar modellen:
-model.fit(X, y)
-print("Intercept (B0):", model.intercept)
-print("Koefficienter (B1, ...):", model.coefficients)
-
-# Nya testvärden för X
-X_new = np.array([6, 7, 8])
-
-# Testar för att förutsäga med modellen:
-y_pred = model.predict(X_new)
-print("Förutsagda värden:", y_pred)
-
-# Testar för R2-metoden med samma data:
-r2 = model.r_squared(X, y)
-print("R² (hur bra modellen passar datan):", r2)
-
-# Kontrollerar antal dimensioner:
-print("Antal features (dimensioner):", model.number_of_features)
-
-# Kontrollerar stickprovsstorleken:
-print("Antal datapunkter (n):", model.sample_size)
-
-# Beräknar variansen:
-variance = model.variance(X, y)
-print("Varians, dvs hur mycket de faktiska värdena skiljer sig ifrån de förutsagda värdena (σ²):", variance)
-
-# Beräknar signifikans för regressionen:
-print("F-statistik:", model.significance(X, y))
-
-# Beräknar standardavvikelsen:
-standard_deviation = model.standard_deviation(X, y)
-print("Standardavvikelse, vilket visar en mer noggrann skillnad mellan de förutsagda värdena och de faktiska värdena (σ):", standard_deviation)
-
-correlation_results = model.pearson_correlation(X, y)
-
-for feature, (corr, p_val) in correlation_results.items():
-    print(f"{feature}: Korrelation = {corr:.3f}, p-värde = {p_val:.3f}")
-
