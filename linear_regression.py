@@ -155,37 +155,10 @@ class LinearRegression:
 
         c = np.linalg.pinv(X.T @ X) * self.variance(X, y)
 
-        # För att kunna använda denna metoden när jag undersöker "Observer bias" så behöver jag göra ett specialfall när jag bara har en binär variabel.
-        if c.shape[1] == 1:
-            # Här isolerar jag de två grupperna i vår binära variabel så att jag får två separata listor med y-värden, en för varje Observer.
-            y_group_0 = y[X.flatten() == 0]
-            y_group_1 = y[X.flatten() == 1]
-
-            # Jag beräknar sedan medelvärdet, variansen och antal observationer för varje grupp.
-
-            mean_0, mean_1 = np.mean(y_group_0), np.mean(y_group_1)
-
-            var_0, var_1 = np.var(y_group_0, ddof=1), np.var(y_group_1, ddof=1)
-
-            n_0, n_1 = len(y_group_0), len(y_group_1)
-
-            # Jag beräknar sedan t-värdet med hjälp av "Welch's t-test", vilket jag använder eftersom det ska vara en bra metod för att jämföra två grupper med olika varians.
-            t_value = (mean_0 - mean_1) / np.sqrt(var_0 / n_0 + var_1 / n_1)
-
-            # Frihetsgrader (DOF)
-            dof = ((var_0 / n_0 + var_1 / n_1) ** 2) / (
-                ((var_0 / n_0) ** 2) / (n_0 - 1) +
-                ((var_1 / n_1) ** 2) / (n_1 - 1)
-            )
-
-            # P-värde
-            p_value = 2 * min(stats.t.cdf(t_value, dof),
-                              stats.t.sf(t_value, dof))
-            return [t_value], [p_value]
-
         # Standardberäkning för flera variabler
         t_values = [self.coefficients[i] /
-                    (np.sqrt(c[i, i])) for i in range(c.shape[1] - 1)]
+                    (np.sqrt(c[i, i])) for i in range(len(self.coefficients))]
+
         dof = self.sample_size - self.number_of_features - 1
         p_values = [2 * min(stats.t.cdf(t, dof), stats.t.sf(t, dof))
                     for t in t_values]
